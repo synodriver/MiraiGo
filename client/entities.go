@@ -11,6 +11,7 @@ import (
 var (
 	ErrAlreadyOnline  = errors.New("already online")
 	ErrMemberNotFound = errors.New("member not found")
+	ErrNotExists      = errors.New("not exists")
 )
 
 type (
@@ -151,27 +152,6 @@ type (
 		Message string
 	}
 
-	GroupInvitedRequest struct {
-		RequestId   int64
-		InvitorUin  int64
-		InvitorNick string
-		GroupCode   int64
-		GroupName   string
-
-		client *QQClient
-	}
-
-	UserJoinGroupRequest struct {
-		RequestId     int64
-		Message       string
-		RequesterUin  int64
-		RequesterNick string
-		GroupCode     int64
-		GroupName     string
-
-		client *QQClient
-	}
-
 	NewFriendRequest struct {
 		RequestId     int64
 		Message       string
@@ -223,18 +203,16 @@ type (
 	}
 
 	imageUploadResponse struct {
-		ResultCode int32
-		Message    string
-
-		IsExists bool
-		FileId   int64
-		Width    int32
-		Height   int32
-
-		ResourceId string
 		UploadKey  []byte
 		UploadIp   []int32
 		UploadPort []int32
+		ResourceId string
+		Message    string
+		FileId     int64
+		Width      int32
+		Height     int32
+		ResultCode int32
+		IsExists   bool
 	}
 
 	pttUploadResponse struct {
@@ -272,7 +250,7 @@ const (
 	Member
 
 	AndroidPhone ClientProtocol = 1
-	AndroidPad   ClientProtocol = 2
+	IPad         ClientProtocol = 2
 	AndroidWatch ClientProtocol = 3
 )
 
