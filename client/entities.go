@@ -1,11 +1,12 @@
 package client
 
 import (
-	"errors"
-	"github.com/Mrs4s/MiraiGo/binary/jce"
-	"github.com/Mrs4s/MiraiGo/message"
 	"strings"
 	"sync"
+
+	"github.com/Mrs4s/MiraiGo/binary/jce"
+	"github.com/Mrs4s/MiraiGo/message"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -44,7 +45,6 @@ type (
 		Nickname string
 		Remark   string
 		FaceId   int16
-
 		//msgSeqList *utils.Cache
 	}
 
@@ -75,8 +75,9 @@ type (
 		MaxMemberCount uint16
 		Members        []*GroupMemberInfo
 
-		client *QQClient
-		lock   sync.RWMutex
+		client     *QQClient
+		lastMsgSeq int64
+		lock       sync.RWMutex
 	}
 
 	GroupMemberInfo struct {
@@ -130,7 +131,7 @@ type (
 		Member  *GroupMemberInfo
 	}
 
-	IGroupNotifyEvent interface {
+	INotifyEvent interface {
 		From() int64
 		Content() string
 	}
@@ -197,6 +198,12 @@ type (
 		Y int32 `json:"y"`
 	}
 
+	AtAllRemainInfo struct {
+		CanAtAll                 bool   `json:"can_at_all"`
+		RemainAtAllCountForGroup uint32 `json:"remain_at_all_count_for_group"`
+		RemainAtAllCountForUin   uint32 `json:"remain_at_all_count_for_uin"`
+	}
+
 	groupMemberListResponse struct {
 		NextUin int64
 		list    []*GroupMemberInfo
@@ -226,6 +233,7 @@ type (
 		UploadIp   []string
 		UploadPort []int32
 		FileKey    []byte
+		FileId     int64
 	}
 
 	groupMessageReceiptEvent struct {
@@ -252,6 +260,7 @@ const (
 	AndroidPhone ClientProtocol = 1
 	IPad         ClientProtocol = 2
 	AndroidWatch ClientProtocol = 3
+	MacOS        ClientProtocol = 4
 )
 
 func (g *GroupInfo) UpdateName(newName string) {
@@ -296,18 +305,22 @@ func (g *GroupInfo) AdministratorOrOwner() bool {
 
 func (g *GroupInfo) FindMember(uin int64) *GroupMemberInfo {
 	r := g.Read(func(info *GroupInfo) interface{} {
-		for _, m := range info.Members {
-			f := m
-			if f.Uin == uin {
-				return f
-			}
-		}
-		return nil
+		return info.FindMemberWithoutLock(uin)
 	})
 	if r == nil {
 		return nil
 	}
 	return r.(*GroupMemberInfo)
+}
+
+func (g *GroupInfo) FindMemberWithoutLock(uin int64) *GroupMemberInfo {
+	for _, m := range g.Members {
+		f := m
+		if f.Uin == uin {
+			return f
+		}
+	}
+	return nil
 }
 
 func (g *GroupInfo) Update(f func(*GroupInfo)) {
@@ -330,7 +343,7 @@ func (m *GroupMemberInfo) DisplayName() string {
 }
 
 func (m *GroupMemberInfo) EditCard(card string) {
-	if m.Manageable() && len(card) <= 60 {
+	if m.CardChangable() && len(card) <= 60 {
 		m.Group.client.editMemberCard(m.Group.Code, m.Uin, card)
 		m.CardName = card
 	}
@@ -353,9 +366,9 @@ func (m *GroupMemberInfo) EditSpecialTitle(title string) {
 	}
 }
 
-func (m *GroupMemberInfo) Kick(msg string) {
+func (m *GroupMemberInfo) Kick(msg string, block bool) {
 	if m.Uin != m.Group.client.Uin && m.Manageable() {
-		m.Group.client.kickGroupMember(m.Group.Code, m.Uin, msg)
+		m.Group.client.kickGroupMember(m.Group.Code, m.Uin, msg, block)
 	}
 }
 
@@ -376,6 +389,17 @@ func (m *GroupMemberInfo) Manageable() bool {
 		return false
 	}
 	return m.Permission != Administrator || self == Owner
+}
+
+func (m *GroupMemberInfo) CardChangable() bool {
+	if m.Uin == m.Group.client.Uin {
+		return true
+	}
+	self := m.Group.SelfPermission()
+	if self == Member {
+		return false
+	}
+	return m.Permission != Owner
 }
 
 func (r *UserJoinGroupRequest) Accept() {

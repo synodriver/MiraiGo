@@ -2,8 +2,10 @@ package client
 
 import (
 	"fmt"
-	"github.com/Mrs4s/MiraiGo/message"
+	"runtime/debug"
 	"sync"
+
+	"github.com/Mrs4s/MiraiGo/message"
 )
 
 type eventHandlers struct {
@@ -26,7 +28,8 @@ type eventHandlers struct {
 	disconnectHandlers          []func(*QQClient, *ClientDisconnectedEvent)
 	logHandlers                 []func(*QQClient, *LogEvent)
 	serverUpdatedHandlers       []func(*QQClient, *ServerUpdatedEvent) bool
-	notifyHandlers              []func(*QQClient, IGroupNotifyEvent)
+	groupNotifyHandlers         []func(*QQClient, INotifyEvent)
+	friendNotifyHandlers        []func(*QQClient, INotifyEvent)
 	offlineFileHandlers         []func(*QQClient, *OfflineFileEvent)
 	groupMessageReceiptHandlers sync.Map
 }
@@ -119,8 +122,12 @@ func (c *QQClient) OnLog(f func(*QQClient, *LogEvent)) {
 	c.eventHandlers.logHandlers = append(c.eventHandlers.logHandlers, f)
 }
 
-func (c *QQClient) OnGroupNotify(f func(*QQClient, IGroupNotifyEvent)) {
-	c.eventHandlers.notifyHandlers = append(c.eventHandlers.notifyHandlers, f)
+func (c *QQClient) OnGroupNotify(f func(*QQClient, INotifyEvent)) {
+	c.eventHandlers.groupNotifyHandlers = append(c.eventHandlers.groupNotifyHandlers, f)
+}
+
+func (c *QQClient) OnFriendNotify(f func(*QQClient, INotifyEvent)) {
+	c.eventHandlers.friendNotifyHandlers = append(c.eventHandlers.friendNotifyHandlers, f)
 }
 
 func NewUinFilterPrivate(uin int64) func(*message.PrivateMessage) bool {
@@ -320,11 +327,22 @@ func (c *QQClient) dispatchNewFriendEvent(e *NewFriendEvent) {
 	}
 }
 
-func (c *QQClient) dispatchGroupNotifyEvent(e IGroupNotifyEvent) {
+func (c *QQClient) dispatchGroupNotifyEvent(e INotifyEvent) {
 	if e == nil {
 		return
 	}
-	for _, f := range c.eventHandlers.notifyHandlers {
+	for _, f := range c.eventHandlers.groupNotifyHandlers {
+		cover(func() {
+			f(c, e)
+		})
+	}
+}
+
+func (c *QQClient) dispatchFriendNotifyEvent(e INotifyEvent) {
+	if e == nil {
+		return
+	}
+	for _, f := range c.eventHandlers.friendNotifyHandlers {
 		cover(func() {
 			f(c, e)
 		})
@@ -367,7 +385,7 @@ func (c *QQClient) dispatchLogEvent(e *LogEvent) {
 func cover(f func()) {
 	defer func() {
 		if pan := recover(); pan != nil {
-			fmt.Println("event error:", pan)
+			fmt.Printf("event error: %v\n%s", pan, debug.Stack())
 		}
 	}()
 	f()

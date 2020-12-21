@@ -5,28 +5,29 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"image"
 	"io"
-	"math"
 	"math/rand"
 	"net"
+	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 
 	"github.com/Mrs4s/MiraiGo/binary"
-	"github.com/Mrs4s/MiraiGo/client/pb/longmsg"
 	"github.com/Mrs4s/MiraiGo/client/pb/msg"
-	"github.com/Mrs4s/MiraiGo/client/pb/multimsg"
 	"github.com/Mrs4s/MiraiGo/message"
 	"github.com/Mrs4s/MiraiGo/protocol/packets"
 	"github.com/Mrs4s/MiraiGo/utils"
 )
+
+//go:generate go run github.com/a8m/syncmap -o "handler_map_gen.go" -pkg client -name HandlerMap "map[uint16]func(i interface{}, err error)"
 
 type QQClient struct {
 	Uin         int64
@@ -47,8 +48,7 @@ type QQClient struct {
 	Conn                    net.Conn
 	ConnectTime             time.Time
 
-	decoders        map[string]func(*QQClient, uint16, []byte) (interface{}, error)
-	handlers        sync.Map
+	handlers        HandlerMap
 	servers         []*net.TCPAddr
 	currServerIndex int
 	retryTimes      int
@@ -85,9 +85,9 @@ type QQClient struct {
 	groupDataTransSeq      int32
 	highwayApplyUpSeq      int32
 	eventHandlers          *eventHandlers
+	stat                   *Statistics
 
 	groupListLock sync.Mutex
-	msgSvcLock    sync.Mutex
 }
 
 type loginSigInfo struct {
@@ -110,6 +110,39 @@ type loginSigInfo struct {
 	pt4TokenMap map[string][]byte
 }
 
+var decoders = map[string]func(*QQClient, uint16, []byte) (interface{}, error){
+	"wtlogin.login":                                      decodeLoginResponse,
+	"wtlogin.exchange_emp":                               decodeExchangeEmpResponse,
+	"StatSvc.register":                                   decodeClientRegisterResponse,
+	"StatSvc.ReqMSFOffline":                              decodeMSFOfflinePacket,
+	"StatSvc.GetDevLoginInfo":                            decodeDevListResponse,
+	"MessageSvc.PushNotify":                              decodeSvcNotify,
+	"OnlinePush.ReqPush":                                 decodeOnlinePushReqPacket,
+	"OnlinePush.PbPushTransMsg":                          decodeOnlinePushTransPacket,
+	"ConfigPushSvc.PushReq":                              decodePushReqPacket,
+	"MessageSvc.PbGetMsg":                                decodeMessageSvcPacket,
+	"MessageSvc.PushForceOffline":                        decodeForceOfflinePacket,
+	"PbMessageSvc.PbMsgWithDraw":                         decodeMsgWithDrawResponse,
+	"friendlist.getFriendGroupList":                      decodeFriendGroupListResponse,
+	"friendlist.GetTroopListReqV2":                       decodeGroupListResponse,
+	"friendlist.GetTroopMemberListReq":                   decodeGroupMemberListResponse,
+	"group_member_card.get_group_member_card_info":       decodeGroupMemberInfoResponse,
+	"ImgStore.GroupPicUp":                                decodeGroupImageStoreResponse,
+	"PttStore.GroupPttUp":                                decodeGroupPttStoreResponse,
+	"LongConn.OffPicUp":                                  decodeOffPicUpResponse,
+	"ProfileService.Pb.ReqSystemMsgNew.Group":            decodeSystemMsgGroupPacket,
+	"ProfileService.Pb.ReqSystemMsgNew.Friend":           decodeSystemMsgFriendPacket,
+	"MultiMsg.ApplyUp":                                   decodeMultiApplyUpResponse,
+	"MultiMsg.ApplyDown":                                 decodeMultiApplyDownResponse,
+	"OidbSvc.0xe07_0":                                    decodeImageOcrResponse,
+	"OidbSvc.0xd79":                                      decodeWordSegmentation,
+	"OidbSvc.0x990":                                      decodeTranslateResponse,
+	"SummaryCard.ReqSummaryCard":                         decodeSummaryCardResponse,
+	"PttCenterSvr.ShortVideoDownReq":                     decodePttShortVideoDownResponse,
+	"LightAppSvc.mini_app_info.GetAppInfoById":           decodeAppInfoResponse,
+	"PttCenterSvr.pb_pttCenter_CMD_REQ_APPLY_UPLOAD-500": decodePrivatePttStoreResponse,
+}
+
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
@@ -126,57 +159,23 @@ func NewClientMd5(uin int64, passwordMd5 [16]byte) *QQClient {
 		SequenceId:              0x3635,
 		RandomKey:               make([]byte, 16),
 		OutGoingPacketSessionId: []byte{0x02, 0xB0, 0x5B, 0x8B},
-		decoders: map[string]func(*QQClient, uint16, []byte) (interface{}, error){
-			"wtlogin.login":                                            decodeLoginResponse,
-			"wtlogin.exchange_emp":                                     decodeExchangeEmpResponse,
-			"StatSvc.register":                                         decodeClientRegisterResponse,
-			"StatSvc.ReqMSFOffline":                                    decodeMSFOfflinePacket,
-			"StatSvc.GetDevLoginInfo":                                  decodeDevListResponse,
-			"MessageSvc.PushNotify":                                    decodeSvcNotify,
-			"OnlinePush.PbPushGroupMsg":                                decodeGroupMessagePacket,
-			"OnlinePush.ReqPush":                                       decodeOnlinePushReqPacket,
-			"OnlinePush.PbPushTransMsg":                                decodeOnlinePushTransPacket,
-			"ConfigPushSvc.PushReq":                                    decodePushReqPacket,
-			"MessageSvc.PbGetMsg":                                      decodeMessageSvcPacket,
-			"MessageSvc.PbSendMsg":                                     decodeMsgSendResponse,
-			"MessageSvc.PushForceOffline":                              decodeForceOfflinePacket,
-			"friendlist.getFriendGroupList":                            decodeFriendGroupListResponse,
-			"friendlist.GetTroopListReqV2":                             decodeGroupListResponse,
-			"friendlist.GetTroopMemberListReq":                         decodeGroupMemberListResponse,
-			"group_member_card.get_group_member_card_info":             decodeGroupMemberInfoResponse,
-			"ImgStore.GroupPicUp":                                      decodeGroupImageStoreResponse,
-			"PttStore.GroupPttUp":                                      decodeGroupPttStoreResponse,
-			"LongConn.OffPicUp":                                        decodeOffPicUpResponse,
-			"ProfileService.Pb.ReqSystemMsgNew.Group":                  decodeSystemMsgGroupPacket,
-			"ProfileService.Pb.ReqSystemMsgNew.Friend":                 decodeSystemMsgFriendPacket,
-			"MultiMsg.ApplyUp":                                         decodeMultiApplyUpResponse,
-			"MultiMsg.ApplyDown":                                       decodeMultiApplyDownResponse,
-			"OidbSvc.0x6d6_2":                                          decodeOIDB6d62Response,
-			"OidbSvc.0x6d6_3":                                          decodeOIDB6d63Response,
-			"OidbSvc.0x6d8_1":                                          decodeOIDB6d81Response,
-			"OidbSvc.0x88d_0":                                          decodeGroupInfoResponse,
-			"OidbSvc.0xe07_0":                                          decodeImageOcrResponse,
-			"OidbSvc.0xd79":                                            decodeWordSegmentation,
-			"OidbSvc.0x990":                                            decodeTranslateResponse,
-			"SummaryCard.ReqSummaryCard":                               decodeSummaryCardResponse,
-			"SummaryCard.ReqSearch":                                    decodeGroupSearchResponse,
-			"PttCenterSvr.ShortVideoDownReq":                           decodePttShortVideoDownResponse,
-			"LightAppSvc.mini_app_info.GetAppInfoById":                 decodeAppInfoResponse,
-			"OfflineFilleHandleSvr.pb_ftn_CMD_REQ_APPLY_DOWNLOAD-1200": decodeOfflineFileDownloadResponse,
-			"PttCenterSvr.pb_pttCenter_CMD_REQ_APPLY_UPLOAD-500":       decodePrivatePttStoreResponse,
-		},
-		sigInfo:                &loginSigInfo{},
-		requestPacketRequestId: 1921334513,
-		groupSeq:               int32(rand.Intn(20000)),
-		friendSeq:              22911,
-		highwayApplyUpSeq:      77918,
-		ksid:                   []byte(fmt.Sprintf("|%s|A8.2.7.27f6ea96", SystemDeviceInfo.IMEI)),
-		eventHandlers:          &eventHandlers{},
-		msgSvcCache:            utils.NewCache(time.Second * 15),
-		transCache:             utils.NewCache(time.Second * 15),
-		onlinePushCache:        utils.NewCache(time.Second * 15),
-		version:                genVersionInfo(SystemDeviceInfo.Protocol),
-		servers:                []*net.TCPAddr{},
+		sigInfo:                 &loginSigInfo{},
+		requestPacketRequestId:  1921334513,
+		groupSeq:                int32(rand.Intn(20000)),
+		friendSeq:               22911,
+		highwayApplyUpSeq:       77918,
+		ksid:                    []byte(fmt.Sprintf("|%s|A8.2.7.27f6ea96", SystemDeviceInfo.IMEI)),
+		eventHandlers:           &eventHandlers{},
+		msgSvcCache:             utils.NewCache(time.Second * 15),
+		transCache:              utils.NewCache(time.Second * 15),
+		onlinePushCache:         utils.NewCache(time.Second * 15),
+		version:                 genVersionInfo(SystemDeviceInfo.Protocol),
+		servers:                 []*net.TCPAddr{},
+		stat:                    &Statistics{},
+	}
+	sso, err := getSSOAddress()
+	if err == nil && len(sso) > 0 {
+		cli.servers = append(sso, cli.servers...)
 	}
 	adds, err := net.LookupIP("msfwifi.3g.qq.com") // host servers
 	if err == nil && len(adds) > 0 {
@@ -189,10 +188,6 @@ func NewClientMd5(uin int64, passwordMd5 [16]byte) *QQClient {
 		}
 		cli.servers = append(hostAddrs, cli.servers...)
 	}
-	sso, err := getSSOAddress()
-	if err == nil && len(sso) > 0 {
-		cli.servers = append(sso, cli.servers...)
-	}
 	if len(cli.servers) == 0 {
 		cli.servers = []*net.TCPAddr{ // default servers
 			{IP: net.IP{42, 81, 172, 81}, Port: 80},
@@ -202,6 +197,27 @@ func NewClientMd5(uin int64, passwordMd5 [16]byte) *QQClient {
 			{IP: net.IP{114, 221, 144, 215}, Port: 80},
 			{IP: net.IP{42, 81, 172, 22}, Port: 80},
 		}
+	}
+	pings := make([]int64, len(cli.servers))
+	wg := sync.WaitGroup{}
+	wg.Add(len(cli.servers))
+	for i := range cli.servers {
+		go func(index int) {
+			defer wg.Done()
+			p, err := qualityTest(cli.servers[index])
+			if err != nil {
+				pings[index] = 9999
+				return
+			}
+			pings[index] = p
+		}(i)
+	}
+	wg.Wait()
+	sort.Slice(cli.servers, func(i, j int) bool {
+		return pings[i] < pings[j]
+	})
+	if len(cli.servers) > 3 {
+		cli.servers = cli.servers[0 : len(cli.servers)/2] // 保留ping值中位数以上的server
 	}
 	rand.Read(cli.RandomKey)
 	return cli
@@ -264,6 +280,20 @@ func (c *QQClient) init() {
 	if !c.heartbeatEnabled {
 		go c.doHeartbeat()
 	}
+	c.stat.once.Do(func() {
+		c.OnGroupMessage(func(_ *QQClient, _ *message.GroupMessage) {
+			c.stat.MessageReceived++
+		})
+		c.OnPrivateMessage(func(_ *QQClient, _ *message.PrivateMessage) {
+			c.stat.MessageReceived++
+		})
+		c.OnTempMessage(func(_ *QQClient, _ *message.TempMessage) {
+			c.stat.MessageReceived++
+		})
+		c.onGroupMessageReceipt("internal", func(_ *QQClient, _ *groupMessageReceiptEvent) {
+			c.stat.MessageSent++
+		})
+	})
 }
 
 func (c *QQClient) RequestSMS() bool {
@@ -384,84 +414,6 @@ func (c *QQClient) GetShortVideoUrl(uuid, md5 []byte) string {
 	return i.(string)
 }
 
-func (c *QQClient) SendGroupMessage(groupCode int64, m *message.SendingMessage, f ...bool) *message.GroupMessage {
-	useFram := false
-	if len(f) > 0 {
-		useFram = f[0]
-	}
-	imgCount := m.Count(func(e message.IMessageElement) bool { return e.Type() == message.Image })
-	if useFram {
-		if m.Any(func(e message.IMessageElement) bool { return e.Type() == message.Reply }) {
-			useFram = false
-		}
-	}
-	msgLen := message.EstimateLength(m.Elements, 703)
-	if msgLen > 5000 || imgCount > 50 {
-		return nil
-	}
-	if (msgLen > 300 || imgCount > 2) && !useFram {
-		ret := c.sendGroupLongOrForwardMessage(groupCode, true, &message.ForwardMessage{Nodes: []*message.ForwardNode{
-			{
-				SenderId:   c.Uin,
-				SenderName: c.Nickname,
-				Time:       int32(time.Now().Unix()),
-				Message:    m.Elements,
-			},
-		}})
-		return ret
-	}
-	return c.sendGroupMessage(groupCode, false, m)
-}
-
-func (c *QQClient) sendGroupMessage(groupCode int64, forward bool, m *message.SendingMessage) *message.GroupMessage {
-	eid := utils.RandomString(6)
-	mr := int32(rand.Uint32())
-	ch := make(chan int32)
-	c.onGroupMessageReceipt(eid, func(c *QQClient, e *groupMessageReceiptEvent) {
-		if e.Rand == mr {
-			ch <- e.Seq
-		}
-	})
-	defer c.onGroupMessageReceipt(eid)
-	imgCount := m.Count(func(e message.IMessageElement) bool { return e.Type() == message.Image })
-	msgLen := message.EstimateLength(m.Elements, 703)
-	if (msgLen > 300 || imgCount > 2) && !forward && !m.Any(func(e message.IMessageElement) bool {
-		_, ok := e.(*message.GroupVoiceElement)
-		_, ok2 := e.(*message.ServiceElement)
-		return ok || ok2
-	}) {
-		div := int32(rand.Uint32())
-		fragmented := m.ToFragmented()
-		for i, elems := range fragmented {
-			_, pkt := c.buildGroupSendingPacket(groupCode, mr, int32(len(fragmented)), int32(i), div, forward, elems)
-			_ = c.send(pkt)
-		}
-	} else {
-		_, pkt := c.buildGroupSendingPacket(groupCode, mr, 1, 0, 0, forward, m.Elements)
-		_ = c.send(pkt)
-	}
-	var mid int32
-	ret := &message.GroupMessage{
-		Id:         -1,
-		InternalId: mr,
-		GroupCode:  groupCode,
-		Sender: &message.Sender{
-			Uin:      c.Uin,
-			Nickname: c.Nickname,
-			IsFriend: true,
-		},
-		Time:     int32(time.Now().Unix()),
-		Elements: m.Elements,
-	}
-	select {
-	case mid = <-ch:
-	case <-time.After(time.Second * 5):
-		return ret
-	}
-	ret.Id = mid
-	return ret
-}
-
 func (c *QQClient) SendPrivateMessage(target int64, m *message.SendingMessage) *message.PrivateMessage {
 	mr := int32(rand.Uint32())
 	seq := c.nextFriendSeq()
@@ -482,6 +434,7 @@ func (c *QQClient) SendPrivateMessage(target int64, m *message.SendingMessage) *
 		_, pkt := c.buildFriendSendingPacket(target, seq, mr, 1, 0, 0, t, m.Elements)
 		_ = c.send(pkt)
 	}
+	c.stat.MessageSent++
 	return &message.PrivateMessage{
 		Id:         seq,
 		InternalId: mr,
@@ -516,6 +469,7 @@ func (c *QQClient) SendTempMessage(groupCode, target int64, m *message.SendingMe
 	t := time.Now().Unix()
 	_, pkt := c.buildTempSendingPacket(group.Uin, target, seq, mr, t, m)
 	_ = c.send(pkt)
+	c.stat.MessageSent++
 	return &message.TempMessage{
 		Id:        seq,
 		GroupCode: group.Code,
@@ -538,84 +492,26 @@ func (c *QQClient) GetForwardMessage(resId string) *message.ForwardMessage {
 	ret := &message.ForwardMessage{}
 	for _, m := range multiMsg.Msg {
 		ret.Nodes = append(ret.Nodes, &message.ForwardNode{
-			SenderId: m.Head.FromUin,
+			SenderId: m.Head.GetFromUin(),
 			SenderName: func() string {
-				if m.Head.MsgType == 82 && m.Head.GroupInfo != nil {
-					return m.Head.GroupInfo.GroupCard
+				if m.Head.GetMsgType() == 82 && m.Head.GroupInfo != nil {
+					return m.Head.GroupInfo.GetGroupCard()
 				}
-				return m.Head.FromNick
+				return m.Head.GetFromNick()
 			}(),
-			Time:    m.Head.MsgTime,
+			Time:    m.Head.GetMsgTime(),
 			Message: message.ParseMessageElems(m.Body.RichText.Elems),
 		})
 	}
 	return ret
 }
 
-func (c *QQClient) SendGroupForwardMessage(groupCode int64, m *message.ForwardMessage) *message.GroupMessage {
-	return c.sendGroupLongOrForwardMessage(groupCode, false, m)
-}
-
-func (c *QQClient) sendGroupLongOrForwardMessage(groupCode int64, isLong bool, m *message.ForwardMessage) *message.GroupMessage {
-	if len(m.Nodes) >= 200 {
-		return nil
-	}
-	ts := time.Now().Unix()
-	seq := c.nextGroupSeq()
-	data, hash := m.CalculateValidationData(seq, rand.Int31(), groupCode)
-	i, err := c.sendAndWait(c.buildMultiApplyUpPacket(data, hash, func() int32 {
-		if isLong {
-			return 1
-		} else {
-			return 2
-		}
-	}(), utils.ToGroupUin(groupCode)))
-	if err != nil {
-		return nil
-	}
-	rsp := i.(*multimsg.MultiMsgApplyUpRsp)
-	body, _ := proto.Marshal(&longmsg.LongReqBody{
-		Subcmd:       1,
-		TermType:     5,
-		PlatformType: 9,
-		MsgUpReq: []*longmsg.LongMsgUpReq{
-			{
-				MsgType:    3,
-				DstUin:     utils.ToGroupUin(groupCode),
-				MsgContent: data,
-				StoreType:  2,
-				MsgUkey:    rsp.MsgUkey,
-			},
-		},
-	})
-	for i, ip := range rsp.Uint32UpIp {
-		err := c.highwayUpload(uint32(ip), int(rsp.Uint32UpPort[i]), rsp.MsgSig, body, 27)
-		if err == nil {
-			if !isLong {
-				var pv string
-				for i := 0; i < int(math.Min(4, float64(len(m.Nodes)))); i++ {
-					pv += fmt.Sprintf(`<title size="26" color="#777777">%s: %s</title>`, m.Nodes[i].SenderName, message.ToReadableString(m.Nodes[i].Message))
-				}
-				return c.sendGroupMessage(groupCode, true, genForwardTemplate(rsp.MsgResid, pv, "群聊的聊天记录", "[聊天记录]", "聊天记录", fmt.Sprintf("查看 %d 条转发消息", len(m.Nodes)), ts))
-			}
-			bri := func() string {
-				var r string
-				for _, n := range m.Nodes {
-					r += message.ToReadableString(n.Message)
-					if len(r) >= 27 {
-						break
-					}
-				}
-				return r
-			}()
-			return c.sendGroupMessage(groupCode, false, genLongTemplate(rsp.MsgResid, bri, ts))
-		}
-	}
-	return nil
-}
-
 func (c *QQClient) sendGroupPoke(groupCode, target int64) {
 	_, _ = c.sendAndWait(c.buildGroupPokePacket(groupCode, target))
+}
+
+func (c *QQClient) SendFriendPoke(target int64) {
+	_, _ = c.sendAndWait(c.buildFriendPokePacket(target))
 }
 
 func (c *QQClient) UploadGroupImage(groupCode int64, img []byte) (*message.GroupImageElement, error) {
@@ -641,7 +537,12 @@ func (c *QQClient) UploadGroupImage(groupCode int64, img []byte) (*message.Group
 	}
 	return nil, errors.New("upload failed")
 ok:
-	return message.NewGroupImage(binary.CalculateImageResourceId(h[:]), h[:], rsp.FileId, int32(len(img)), rsp.Width, rsp.Height), nil
+	i, _, _ := image.DecodeConfig(bytes.NewReader(img))
+	var imageType int32 = 1000
+	if bytes.HasPrefix(img, []byte{0x47, 0x49, 0x46, 0x38}) {
+		imageType = 2000
+	}
+	return message.NewGroupImage(binary.CalculateImageResourceId(h[:]), h[:], rsp.FileId, int32(len(img)), int32(i.Width), int32(i.Height), imageType), nil
 }
 
 func (c *QQClient) UploadPrivateImage(target int64, img []byte) (*message.FriendImageElement, error) {
@@ -652,7 +553,7 @@ func (c *QQClient) uploadPrivateImage(target int64, img []byte, count int) (*mes
 	count++
 	h := md5.Sum(img)
 	e, err := c.QueryFriendImage(target, h[:], int32(len(img)))
-	if err == ErrNotExists {
+	if errors.Is(err, ErrNotExists) {
 		// use group highway upload and query again for image id.
 		if _, err = c.UploadGroupImage(target, img); err != nil {
 			return nil, err
@@ -696,9 +597,9 @@ func (c *QQClient) QueryGroupImage(groupCode int64, hash []byte, size int32) (*m
 		return nil, errors.New(rsp.Message)
 	}
 	if rsp.IsExists {
-		return message.NewGroupImage(binary.CalculateImageResourceId(hash), hash, rsp.FileId, size, rsp.Width, rsp.Height), nil
+		return message.NewGroupImage(binary.CalculateImageResourceId(hash), hash, rsp.FileId, size, rsp.Width, rsp.Height, 1000), nil
 	}
-	return nil, errors.New("image not exists")
+	return nil, errors.New("image does not exist")
 }
 
 func (c *QQClient) QueryFriendImage(target int64, hash []byte, size int32) (*message.FriendImageElement, error) {
@@ -714,7 +615,7 @@ func (c *QQClient) QueryFriendImage(target int64, hash []byte, size int32) (*mes
 		return &message.FriendImageElement{
 			ImageId: rsp.ResourceId,
 			Md5:     hash,
-		}, ErrNotExists
+		}, errors.WithStack(ErrNotExists)
 	}
 	return &message.FriendImageElement{
 		ImageId: rsp.ResourceId,
@@ -771,7 +672,7 @@ func (c *QQClient) GetGroupMembers(group *GroupInfo) ([]*GroupMemberInfo, error)
 			return nil, err
 		}
 		if data == nil {
-			return nil, errors.New("rsp is nil")
+			return nil, errors.New("group member list unavailable: rsp is nil")
 		}
 		rsp := data.(groupMemberListResponse)
 		nextUin = rsp.NextUin
@@ -909,8 +810,8 @@ func (c *QQClient) quitGroup(groupCode int64) {
 	_, _ = c.sendAndWait(c.buildQuitGroupPacket(groupCode))
 }
 
-func (c *QQClient) kickGroupMember(groupCode, memberUin int64, msg string) {
-	_, _ = c.sendAndWait(c.buildGroupKickPacket(groupCode, memberUin, msg))
+func (c *QQClient) kickGroupMember(groupCode, memberUin int64, msg string, block bool) {
+	_, _ = c.sendAndWait(c.buildGroupKickPacket(groupCode, memberUin, msg, block))
 }
 
 func (g *GroupInfo) removeMember(uin int64) {
@@ -934,7 +835,7 @@ func (c *QQClient) connect() error {
 	if err != nil || conn == nil {
 		c.retryTimes++
 		if c.retryTimes > len(c.servers) {
-			return errors.New("network error")
+			return errors.New("All servers are unreachable")
 		}
 		c.Error("connect server error: %v", err)
 		if err = c.connect(); err != nil {
@@ -996,7 +897,12 @@ func (c *QQClient) nextHighwayApplySeq() int32 {
 
 func (c *QQClient) send(pkt []byte) error {
 	_, err := c.Conn.Write(pkt)
-	return err
+	if err != nil {
+		c.stat.PacketLost++
+	} else {
+		c.stat.PacketSent++
+	}
+	return errors.Wrap(err, "Packet failed to send")
 }
 
 func (c *QQClient) sendAndWait(seq uint16, pkt []byte) (interface{}, error) {
@@ -1004,10 +910,12 @@ func (c *QQClient) sendAndWait(seq uint16, pkt []byte) (interface{}, error) {
 		Response interface{}
 		Error    error
 	}
-	_, err := c.Conn.Write(pkt)
+
+	err := c.send(pkt)
 	if err != nil {
 		return nil, err
 	}
+
 	ch := make(chan T)
 	defer close(ch)
 	c.handlers.Store(seq, func(i interface{}, err error) {
@@ -1016,6 +924,7 @@ func (c *QQClient) sendAndWait(seq uint16, pkt []byte) (interface{}, error) {
 			Error:    err,
 		}
 	})
+
 	retry := 0
 	for true {
 		select {
@@ -1030,7 +939,7 @@ func (c *QQClient) sendAndWait(seq uint16, pkt []byte) (interface{}, error) {
 			c.handlers.Delete(seq)
 			//c.Error("packet timed out, seq: %v", seq)
 			//println("Packet Timed out")
-			return nil, errors.New("timeout")
+			return nil, errors.New("Packet timed out")
 		}
 	}
 	return nil, nil
@@ -1046,15 +955,16 @@ func (c *QQClient) netLoop() {
 	errCount := 0
 	for c.NetLooping {
 		l, err := reader.ReadInt32()
-		if err == io.EOF || err == io.ErrClosedPipe {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) {
 			c.Error("connection dropped by server: %v", err)
+			c.stat.DisconnectTimes++
 			err = c.connect()
 			if err != nil {
 				c.Error("connect server error: %v", err)
 				break
 			}
 			reader = binary.NewNetworkReader(c.Conn)
-			if e := c.registerClient(); e != nil {
+			if e := c.registerClient(); e != nil && e.Error() != "Packet timed out" { // 掉线在心跳已经有判断了, 只需要处理返回值
 				c.Disconnect()
 				c.lastLostMsg = "register client failed: " + e.Error()
 				c.Error("reconnect failed: " + e.Error())
@@ -1073,7 +983,7 @@ func (c *QQClient) netLoop() {
 		pkt, err := packets.ParseIncomingPacket(data, c.sigInfo.d2Key)
 		if err != nil {
 			c.Error("parse incoming packet error: %v", err)
-			if err == packets.ErrSessionExpired || err == packets.ErrPacketDropped {
+			if errors.Is(err, packets.ErrSessionExpired) || errors.Is(err, packets.ErrPacketDropped) {
 				break
 			}
 			errCount++
@@ -1094,29 +1004,28 @@ func (c *QQClient) netLoop() {
 		errCount = 0
 		retry = 0
 		c.Debug("rev pkt: %v seq: %v", pkt.CommandName, pkt.SequenceId)
+		c.stat.PacketReceived++
 		go func() {
 			defer func() {
 				if pan := recover(); pan != nil {
-					c.Error("panic on decoder %v : %v", pkt.CommandName, pan)
-					//fmt.Println("panic on decoder:", pan)
+					c.Error("panic on decoder %v : %v\n%s", pkt.CommandName, pan, debug.Stack())
 				}
 			}()
-			decoder, ok := c.decoders[pkt.CommandName]
-			if !ok {
-				if f, ok := c.handlers.Load(pkt.SequenceId); ok {
-					c.handlers.Delete(pkt.SequenceId)
-					f.(func(i interface{}, err error))(nil, nil)
+
+			if decoder, ok := decoders[pkt.CommandName]; ok {
+				// found predefined decoder
+				rsp, err := decoder(c, pkt.SequenceId, payload)
+				if err != nil {
+					c.Debug("decode pkt %v error: %+v", pkt.CommandName, err)
 				}
-				return
-			}
-			rsp, err := decoder(c, pkt.SequenceId, payload)
-			if err != nil {
-				c.Debug("decode pkt %v error: %v", pkt.CommandName, err)
-				//log.Println("decode", pkt.CommandName, "error:", err)
-			}
-			if f, ok := c.handlers.Load(pkt.SequenceId); ok {
-				c.handlers.Delete(pkt.SequenceId)
-				f.(func(i interface{}, err error))(rsp, err)
+				if f, ok := c.handlers.LoadAndDelete(pkt.SequenceId); ok {
+					f(rsp, err)
+				}
+			} else if f, ok := c.handlers.LoadAndDelete(pkt.SequenceId); ok {
+				// does not need decoder
+				f(nil, nil)
+			} else {
+				c.Debug("\nUnhandled Command: %s\nSeq: %d\nThis message can be ignored.", pkt.CommandName, pkt.SequenceId)
 			}
 		}()
 	}
@@ -1126,6 +1035,7 @@ func (c *QQClient) netLoop() {
 	if c.lastLostMsg == "" {
 		c.lastLostMsg = "Connection lost."
 	}
+	c.stat.LostTimes++
 	c.dispatchDisconnectEvent(&ClientDisconnectedEvent{Message: c.lastLostMsg})
 }
 

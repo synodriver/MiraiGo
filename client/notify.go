@@ -2,8 +2,9 @@ package client
 
 import (
 	"fmt"
-	"github.com/Mrs4s/MiraiGo/client/pb/notify"
 	"strconv"
+
+	"github.com/Mrs4s/MiraiGo/client/pb/notify"
 )
 
 type (
@@ -27,6 +28,12 @@ type (
 		Honor     HonorType
 		Uin       int64
 		Nick      string
+	}
+
+	// FriendPokeNotifyEvent 好友戳一戳提示事件
+	FriendPokeNotifyEvent struct {
+		Sender   int64
+		Receiver int64
 	}
 )
 
@@ -85,6 +92,14 @@ func (e *GroupPokeNotifyEvent) From() int64 {
 }
 
 func (e *GroupPokeNotifyEvent) Content() string {
+	return fmt.Sprintf("%d戳了戳%d", e.Sender, e.Receiver)
+}
+
+func (e *FriendPokeNotifyEvent) From() int64 {
+	return e.Sender
+}
+
+func (e *FriendPokeNotifyEvent) Content() string {
 	return fmt.Sprintf("%d戳了戳%d", e.Sender, e.Receiver)
 }
 
