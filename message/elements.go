@@ -88,11 +88,13 @@ type ReplyElement struct {
 }
 
 type ShortVideoElement struct {
-	Name string
-	Uuid []byte
-	Size int32
-	Md5  []byte
-	Url  string
+	Name      string
+	Uuid      []byte
+	Size      int32
+	ThumbSize int32
+	Md5       []byte
+	ThumbMd5  []byte
+	Url       string
 }
 
 type ServiceElement struct {
@@ -103,7 +105,10 @@ type ServiceElement struct {
 }
 
 type ForwardElement struct {
-	ResId string
+	FileName string
+	Content  string
+	ResId    string
+	Items    []*msg.PbMultiMsgItem
 }
 
 type LightAppElement struct {
@@ -113,6 +118,19 @@ type LightAppElement struct {
 type RedBagElement struct {
 	MsgType RedBagMessageType
 	Title   string
+}
+
+// MusicShareElement 音乐分享卡片
+//
+// 请使用 SendGroupMusicShare 或者 SendFriendMusicShare 发送
+type MusicShareElement struct {
+	MusicType  int    // 音乐类型,请使用 QQMusic 等常量
+	Title      string // 标题(歌曲名)
+	Brief      string
+	Summary    string // 简介(歌手名)
+	Url        string // 点击跳转链接
+	PictureUrl string // 显示图片链接
+	MusicUrl   string // 音乐播放链接
 }
 
 // TODO: 总之就是非常傻逼
@@ -140,10 +158,28 @@ type FriendFlashPicElement struct {
 
 type RedBagMessageType int
 
+// /com/tencent/mobileqq/data/MessageForQQWalletMsg.java
 const (
-	Simple RedBagMessageType = 2
-	Lucky  RedBagMessageType = 3
-	World  RedBagMessageType = 6
+	RedBagSimple             RedBagMessageType = 2
+	RedBagLucky              RedBagMessageType = 3
+	RedBagSimpleTheme        RedBagMessageType = 4
+	RedBagLuckyTheme         RedBagMessageType = 5
+	RedBagWord               RedBagMessageType = 6
+	RedBagSimpleSpecify      RedBagMessageType = 7
+	RedBagLuckySpecify       RedBagMessageType = 8
+	RedBagSimpleSpecifyOver3 RedBagMessageType = 11
+	RedBagLuckySpecifyOver3  RedBagMessageType = 12
+	RedBagVoice              RedBagMessageType = 13
+	RedBagLook               RedBagMessageType = 14 // ?
+	RedBagVoiceC2C           RedBagMessageType = 15
+	RedBagH5                 RedBagMessageType = 17
+	RedBagKSong              RedBagMessageType = 18
+	RedBagEmoji              RedBagMessageType = 19
+	RedBagDraw               RedBagMessageType = 22
+	RedBagH5Common           RedBagMessageType = 20
+	RedBagWordChain          RedBagMessageType = 24
+	RedBagKeyword            RedBagMessageType = 25 // ?
+	RedBagDrawMultiModel     RedBagMessageType = 26 // ??
 )
 
 func NewText(s string) *TextElement {
@@ -318,6 +354,11 @@ func (e *LightAppElement) Type() ElementType {
 	return LightApp
 }
 
+// Type implement message.IMessageElement
+func (e *MusicShareElement) Type() ElementType {
+	return LightApp
+}
+
 func (e *RedBagElement) Type() ElementType {
 	return RedBag
 }
@@ -375,7 +416,8 @@ var faceMap = map[int]string{
 	106: "委屈",
 	107: "快哭了",
 	108: "阴险",
-	109: "亲亲",
+	305: "右亲亲",
+	109: "左亲亲",
 	110: "吓",
 	111: "可怜",
 	172: "眨眼睛",
@@ -391,6 +433,16 @@ var faceMap = map[int]string{
 	181: "骚扰",
 	176: "小纠结",
 	183: "我最美",
+
+	// newSysFaceMap
+
+	192: "红包",
+	137: "嗨皮牛耶",
+	138: "灯笼",
+	136: "双喜",
+
+	// newSysFaceMap
+
 	112: "菜刀",
 	89:  "西瓜",
 	113: "啤酒",
@@ -409,6 +461,8 @@ var faceMap = map[int]string{
 	54:  "闪电",
 	55:  "炸弹",
 	56:  "刀",
+
+	145: "祈祷",
 	57:  "足球",
 	117: "瓢虫",
 	59:  "便便",
@@ -442,12 +496,8 @@ var faceMap = map[int]string{
 	132: "献吻",
 	133: "左太极",
 	134: "右太极",
-	136: "双喜",
-	137: "鞭炮",
-	138: "灯笼",
 	140: "K歌",
 	144: "喝彩",
-	145: "祈祷",
 	146: "爆筋",
 	147: "棒棒糖",
 	148: "喝奶",
@@ -456,7 +506,6 @@ var faceMap = map[int]string{
 	168: "药",
 	169: "手枪",
 	188: "蛋",
-	192: "红包",
 	184: "河蟹",
 	185: "羊驼",
 	190: "菊花",
@@ -477,10 +526,15 @@ var faceMap = map[int]string{
 	208: "小样儿",
 	210: "飙泪",
 	211: "我不看",
-	247: "口罩护体",
+
+	// newSysFaceMap
 }
 
 var newSysFaceMap = map[int]string{
+
+	245: "加油必胜",
+	246: "加油抱抱",
+	247: "口罩护体",
 	260: "搬砖中",
 	261: "忙到飞起",
 	262: "脑阔疼",
@@ -494,20 +548,74 @@ var newSysFaceMap = map[int]string{
 	270: "emm",
 	271: "吃瓜",
 	272: "呵呵哒",
-	273: "我酸了",
-	274: "太南了",
-	276: "辣椒酱",
 	277: "汪汪",
-	278: "汗",
-	279: "打脸",
-	280: "击掌",
+	307: "牛转钱坤",
+	306: "牛气冲天",
 	281: "无眼笑",
 	282: "敬礼",
 	283: "狂笑",
 	284: "面无表情",
 	285: "摸鱼",
+	293: "摸锦鲤",
 	286: "魔鬼笑",
 	287: "哦",
 	288: "请",
 	289: "睁眼",
+	294: "期待",
+	295: "拿到红包",
+	296: "真好",
+	297: "拜谢",
+	298: "元宝",
+	299: "牛啊",
+	300: "胖三斤",
+	301: "好闪",
+	303: "右拜年",
+	302: "左拜年",
+	304: "红包包",
+
+	273: "我酸了",
+	274: "太南了",
+
+	308: "求红包",
+	309: "谢红包",
+	310: "新年烟花",
+	290: "敲开心",
+	291: "震惊",
+	292: "让我康康",
+	278: "汗",
+	279: "打脸",
+	280: "击掌",
+	242: "头撞击",
+	243: "甩头",
+	244: "扔狗",
+	215: "糊脸",
+	237: "偷看",
+	226: "拍桌",
+	214: "啵啵",
+	217: "扯一扯",
+	240: "喷脸",
+	216: "拍头",
+	218: "舔一舔",
+	229: "干杯",
+	238: "扇脸",
+	219: "蹭一蹭",
+	225: "撩一撩",
+	231: "哼",
+	233: "掐一掐",
+	221: "顶呱呱",
+	222: "抱抱",
+	239: "原谅",
+	232: "佛系",
+	220: "拽炸天",
+	235: "颤抖",
+	241: "生日快乐",
+	230: "嘲讽",
+	224: "开枪",
+	236: "啃头",
+	228: "恭喜",
+	234: "惊呆",
+	223: "暴击",
+	227: "拍手",
+
+	276: "辣椒酱", // 疑似删除
 }

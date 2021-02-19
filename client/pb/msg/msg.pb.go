@@ -7,11 +7,12 @@
 package msg
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	proto "github.com/golang/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -6041,8 +6042,8 @@ type PbMultiMsgItem struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FileName *string `protobuf:"bytes,1,opt,name=fileName" json:"fileName,omitempty"`
-	Buffer   []byte  `protobuf:"bytes,2,opt,name=buffer" json:"buffer,omitempty"`
+	FileName *string        `protobuf:"bytes,1,opt,name=fileName" json:"fileName,omitempty"`
+	Buffer   *PbMultiMsgNew `protobuf:"bytes,2,opt,name=buffer" json:"buffer,omitempty"`
 }
 
 func (x *PbMultiMsgItem) Reset() {
@@ -6084,7 +6085,7 @@ func (x *PbMultiMsgItem) GetFileName() string {
 	return ""
 }
 
-func (x *PbMultiMsgItem) GetBuffer() []byte {
+func (x *PbMultiMsgItem) GetBuffer() *PbMultiMsgNew {
 	if x != nil {
 		return x.Buffer
 	}
@@ -6735,6 +6736,172 @@ func (x *GetGroupMsgResp) GetMsg() []*Message {
 		return x.Msg
 	}
 	return nil
+}
+
+type PbGetOneDayRoamMsgReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PeerUin     *uint64 `protobuf:"varint,1,opt,name=peerUin" json:"peerUin,omitempty"`
+	LastMsgTime *uint64 `protobuf:"varint,2,opt,name=lastMsgTime" json:"lastMsgTime,omitempty"`
+	Random      *uint64 `protobuf:"varint,3,opt,name=random" json:"random,omitempty"`
+	ReadCnt     *uint32 `protobuf:"varint,4,opt,name=readCnt" json:"readCnt,omitempty"`
+}
+
+func (x *PbGetOneDayRoamMsgReq) Reset() {
+	*x = PbGetOneDayRoamMsgReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_msg_proto_msgTypes[67]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PbGetOneDayRoamMsgReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PbGetOneDayRoamMsgReq) ProtoMessage() {}
+
+func (x *PbGetOneDayRoamMsgReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[67]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PbGetOneDayRoamMsgReq.ProtoReflect.Descriptor instead.
+func (*PbGetOneDayRoamMsgReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *PbGetOneDayRoamMsgReq) GetPeerUin() uint64 {
+	if x != nil && x.PeerUin != nil {
+		return *x.PeerUin
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgReq) GetLastMsgTime() uint64 {
+	if x != nil && x.LastMsgTime != nil {
+		return *x.LastMsgTime
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgReq) GetRandom() uint64 {
+	if x != nil && x.Random != nil {
+		return *x.Random
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgReq) GetReadCnt() uint32 {
+	if x != nil && x.ReadCnt != nil {
+		return *x.ReadCnt
+	}
+	return 0
+}
+
+type PbGetOneDayRoamMsgResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Result      *uint32    `protobuf:"varint,1,opt,name=result" json:"result,omitempty"`
+	ErrMsg      *string    `protobuf:"bytes,2,opt,name=errMsg" json:"errMsg,omitempty"`
+	PeerUin     *uint64    `protobuf:"varint,3,opt,name=peerUin" json:"peerUin,omitempty"`
+	LastMsgTime *uint64    `protobuf:"varint,4,opt,name=lastMsgTime" json:"lastMsgTime,omitempty"`
+	Random      *uint64    `protobuf:"varint,5,opt,name=random" json:"random,omitempty"`
+	Msg         []*Message `protobuf:"bytes,6,rep,name=msg" json:"msg,omitempty"`
+	IsComplete  *uint32    `protobuf:"varint,7,opt,name=isComplete" json:"isComplete,omitempty"`
+}
+
+func (x *PbGetOneDayRoamMsgResp) Reset() {
+	*x = PbGetOneDayRoamMsgResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_msg_proto_msgTypes[68]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PbGetOneDayRoamMsgResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PbGetOneDayRoamMsgResp) ProtoMessage() {}
+
+func (x *PbGetOneDayRoamMsgResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[68]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PbGetOneDayRoamMsgResp.ProtoReflect.Descriptor instead.
+func (*PbGetOneDayRoamMsgResp) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetResult() uint32 {
+	if x != nil && x.Result != nil {
+		return *x.Result
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetErrMsg() string {
+	if x != nil && x.ErrMsg != nil {
+		return *x.ErrMsg
+	}
+	return ""
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetPeerUin() uint64 {
+	if x != nil && x.PeerUin != nil {
+		return *x.PeerUin
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetLastMsgTime() uint64 {
+	if x != nil && x.LastMsgTime != nil {
+		return *x.LastMsgTime
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetRandom() uint64 {
+	if x != nil && x.Random != nil {
+		return *x.Random
+	}
+	return 0
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetMsg() []*Message {
+	if x != nil {
+		return x.Msg
+	}
+	return nil
+}
+
+func (x *PbGetOneDayRoamMsgResp) GetIsComplete() uint32 {
+	if x != nil && x.IsComplete != nil {
+		return *x.IsComplete
+	}
+	return 0
 }
 
 var File_msg_proto protoreflect.FileDescriptor
@@ -7692,11 +7859,12 @@ var file_msg_proto_rawDesc = []byte{
 	0x74, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x70, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x12,
 	0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x72, 0x70, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x12, 0x1c, 0x0a,
 	0x09, 0x70, 0x62, 0x52, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x18, 0x13, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x09, 0x70, 0x62, 0x52, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x22, 0x44, 0x0a, 0x0e, 0x50,
+	0x52, 0x09, 0x70, 0x62, 0x52, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x22, 0x54, 0x0a, 0x0e, 0x50,
 	0x62, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x4d, 0x73, 0x67, 0x49, 0x74, 0x65, 0x6d, 0x12, 0x1a, 0x0a,
 	0x08, 0x66, 0x69, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x08, 0x66, 0x69, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x62, 0x75, 0x66,
-	0x66, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x62, 0x75, 0x66, 0x66, 0x65,
+	0x08, 0x66, 0x69, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x62, 0x75, 0x66,
+	0x66, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x50, 0x62, 0x4d, 0x75,
+	0x6c, 0x74, 0x69, 0x4d, 0x73, 0x67, 0x4e, 0x65, 0x77, 0x52, 0x06, 0x62, 0x75, 0x66, 0x66, 0x65,
 	0x72, 0x22, 0x2b, 0x0a, 0x0d, 0x50, 0x62, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x4d, 0x73, 0x67, 0x4e,
 	0x65, 0x77, 0x12, 0x1a, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32,
 	0x08, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x61,
@@ -7777,11 +7945,33 @@ var file_msg_proto_rawDesc = []byte{
 	0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x45, 0x6e, 0x64, 0x53, 0x65, 0x71, 0x18, 0x05, 0x20, 0x01,
 	0x28, 0x04, 0x52, 0x0c, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x45, 0x6e, 0x64, 0x53, 0x65, 0x71,
 	0x12, 0x1a, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x06, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x08, 0x2e,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x2a, 0x2e, 0x0a, 0x08,
-	0x53, 0x79, 0x6e, 0x63, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x09, 0x0a, 0x05, 0x53, 0x54, 0x41, 0x52,
-	0x54, 0x10, 0x00, 0x12, 0x0d, 0x0a, 0x09, 0x43, 0x4f, 0x4e, 0x54, 0x49, 0x4e, 0x55, 0x4d, 0x45,
-	0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x53, 0x54, 0x4f, 0x50, 0x10, 0x02, 0x42, 0x07, 0x5a, 0x05,
-	0x2e, 0x3b, 0x6d, 0x73, 0x67,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x85, 0x01, 0x0a,
+	0x15, 0x50, 0x62, 0x47, 0x65, 0x74, 0x4f, 0x6e, 0x65, 0x44, 0x61, 0x79, 0x52, 0x6f, 0x61, 0x6d,
+	0x4d, 0x73, 0x67, 0x52, 0x65, 0x71, 0x12, 0x18, 0x0a, 0x07, 0x70, 0x65, 0x65, 0x72, 0x55, 0x69,
+	0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x70, 0x65, 0x65, 0x72, 0x55, 0x69, 0x6e,
+	0x12, 0x20, 0x0a, 0x0b, 0x6c, 0x61, 0x73, 0x74, 0x4d, 0x73, 0x67, 0x54, 0x69, 0x6d, 0x65, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x6c, 0x61, 0x73, 0x74, 0x4d, 0x73, 0x67, 0x54, 0x69,
+	0x6d, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x06, 0x72, 0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65,
+	0x61, 0x64, 0x43, 0x6e, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x07, 0x72, 0x65, 0x61,
+	0x64, 0x43, 0x6e, 0x74, 0x22, 0xd8, 0x01, 0x0a, 0x16, 0x50, 0x62, 0x47, 0x65, 0x74, 0x4f, 0x6e,
+	0x65, 0x44, 0x61, 0x79, 0x52, 0x6f, 0x61, 0x6d, 0x4d, 0x73, 0x67, 0x52, 0x65, 0x73, 0x70, 0x12,
+	0x16, 0x0a, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52,
+	0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x65, 0x72, 0x72, 0x4d, 0x73,
+	0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x65, 0x72, 0x72, 0x4d, 0x73, 0x67, 0x12,
+	0x18, 0x0a, 0x07, 0x70, 0x65, 0x65, 0x72, 0x55, 0x69, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04,
+	0x52, 0x07, 0x70, 0x65, 0x65, 0x72, 0x55, 0x69, 0x6e, 0x12, 0x20, 0x0a, 0x0b, 0x6c, 0x61, 0x73,
+	0x74, 0x4d, 0x73, 0x67, 0x54, 0x69, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b,
+	0x6c, 0x61, 0x73, 0x74, 0x4d, 0x73, 0x67, 0x54, 0x69, 0x6d, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x72,
+	0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x72, 0x61, 0x6e,
+	0x64, 0x6f, 0x6d, 0x12, 0x1a, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x06, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x08, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x12,
+	0x1e, 0x0a, 0x0a, 0x69, 0x73, 0x43, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x18, 0x07, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x0a, 0x69, 0x73, 0x43, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x2a,
+	0x2e, 0x0a, 0x08, 0x53, 0x79, 0x6e, 0x63, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x09, 0x0a, 0x05, 0x53,
+	0x54, 0x41, 0x52, 0x54, 0x10, 0x00, 0x12, 0x0d, 0x0a, 0x09, 0x43, 0x4f, 0x4e, 0x54, 0x49, 0x4e,
+	0x55, 0x4d, 0x45, 0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x53, 0x54, 0x4f, 0x50, 0x10, 0x02, 0x42,
+	0x07, 0x5a, 0x05, 0x2e, 0x3b, 0x6d, 0x73, 0x67,
 }
 
 var (
@@ -7797,76 +7987,78 @@ func file_msg_proto_rawDescGZIP() []byte {
 }
 
 var file_msg_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
+var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
 var file_msg_proto_goTypes = []interface{}{
-	(SyncFlag)(0),                 // 0: SyncFlag
-	(*GetMessageRequest)(nil),     // 1: GetMessageRequest
-	(*SendMessageRequest)(nil),    // 2: SendMessageRequest
-	(*SendMessageResponse)(nil),   // 3: SendMessageResponse
-	(*MsgWithDrawReq)(nil),        // 4: MsgWithDrawReq
-	(*C2CMsgWithDrawReq)(nil),     // 5: C2CMsgWithDrawReq
-	(*GroupMsgWithDrawReq)(nil),   // 6: GroupMsgWithDrawReq
-	(*MsgWithDrawResp)(nil),       // 7: MsgWithDrawResp
-	(*C2CMsgWithDrawResp)(nil),    // 8: C2CMsgWithDrawResp
-	(*GroupMsgWithDrawResp)(nil),  // 9: GroupMsgWithDrawResp
-	(*GroupMsgInfo)(nil),          // 10: GroupMsgInfo
-	(*C2CMsgInfo)(nil),            // 11: C2CMsgInfo
-	(*RoutingHead)(nil),           // 12: RoutingHead
-	(*C2C)(nil),                   // 13: C2C
-	(*Grp)(nil),                   // 14: Grp
-	(*GrpTmp)(nil),                // 15: GrpTmp
-	(*MsgCtrl)(nil),               // 16: MsgCtrl
-	(*GetMessageResponse)(nil),    // 17: GetMessageResponse
-	(*PushMessagePacket)(nil),     // 18: PushMessagePacket
-	(*UinPairMessage)(nil),        // 19: UinPairMessage
-	(*Message)(nil),               // 20: Message
-	(*MessageBody)(nil),           // 21: MessageBody
-	(*RichText)(nil),              // 22: RichText
-	(*Elem)(nil),                  // 23: Elem
-	(*CommonElem)(nil),            // 24: CommonElem
-	(*QQWalletMsg)(nil),           // 25: QQWalletMsg
-	(*QQWalletAioBody)(nil),       // 26: QQWalletAioBody
-	(*QQWalletAioElem)(nil),       // 27: QQWalletAioElem
-	(*RichMsg)(nil),               // 28: RichMsg
-	(*CustomElem)(nil),            // 29: CustomElem
-	(*Text)(nil),                  // 30: Text
-	(*Attr)(nil),                  // 31: Attr
-	(*Ptt)(nil),                   // 32: Ptt
-	(*OnlineImage)(nil),           // 33: OnlineImage
-	(*NotOnlineImage)(nil),        // 34: NotOnlineImage
-	(*NotOnlineFile)(nil),         // 35: NotOnlineFile
-	(*TransElem)(nil),             // 36: TransElem
-	(*ExtraInfo)(nil),             // 37: ExtraInfo
-	(*GroupFile)(nil),             // 38: GroupFile
-	(*AnonymousGroupMessage)(nil), // 39: AnonymousGroupMessage
-	(*VideoFile)(nil),             // 40: VideoFile
-	(*SourceMsg)(nil),             // 41: SourceMsg
-	(*Face)(nil),                  // 42: Face
-	(*LightAppElem)(nil),          // 43: LightAppElem
-	(*CustomFace)(nil),            // 44: CustomFace
-	(*ContentHead)(nil),           // 45: ContentHead
-	(*MessageHead)(nil),           // 46: MessageHead
-	(*GroupInfo)(nil),             // 47: GroupInfo
-	(*DiscussInfo)(nil),           // 48: DiscussInfo
-	(*MutilTransHead)(nil),        // 49: MutilTransHead
-	(*C2CTempMessageHead)(nil),    // 50: C2CTempMessageHead
-	(*InstCtrl)(nil),              // 51: InstCtrl
-	(*InstInfo)(nil),              // 52: InstInfo
-	(*ExtGroupKeyInfo)(nil),       // 53: ExtGroupKeyInfo
-	(*SyncCookie)(nil),            // 54: SyncCookie
-	(*TransMsgInfo)(nil),          // 55: TransMsgInfo
-	(*GeneralFlags)(nil),          // 56: GeneralFlags
-	(*PbMultiMsgItem)(nil),        // 57: PbMultiMsgItem
-	(*PbMultiMsgNew)(nil),         // 58: PbMultiMsgNew
-	(*PbMultiMsgTransmit)(nil),    // 59: PbMultiMsgTransmit
-	(*MsgElemInfoServtype3)(nil),  // 60: MsgElemInfo_servtype3
-	(*MsgElemInfoServtype33)(nil), // 61: MsgElemInfo_servtype33
-	(*SubMsgType0X4Body)(nil),     // 62: SubMsgType0x4Body
-	(*ResvAttr)(nil),              // 63: ResvAttr
-	(*AnimationImageShow)(nil),    // 64: AnimationImageShow
-	(*UinTypeUserDef)(nil),        // 65: UinTypeUserDef
-	(*GetGroupMsgReq)(nil),        // 66: GetGroupMsgReq
-	(*GetGroupMsgResp)(nil),       // 67: GetGroupMsgResp
+	(SyncFlag)(0),                  // 0: SyncFlag
+	(*GetMessageRequest)(nil),      // 1: GetMessageRequest
+	(*SendMessageRequest)(nil),     // 2: SendMessageRequest
+	(*SendMessageResponse)(nil),    // 3: SendMessageResponse
+	(*MsgWithDrawReq)(nil),         // 4: MsgWithDrawReq
+	(*C2CMsgWithDrawReq)(nil),      // 5: C2CMsgWithDrawReq
+	(*GroupMsgWithDrawReq)(nil),    // 6: GroupMsgWithDrawReq
+	(*MsgWithDrawResp)(nil),        // 7: MsgWithDrawResp
+	(*C2CMsgWithDrawResp)(nil),     // 8: C2CMsgWithDrawResp
+	(*GroupMsgWithDrawResp)(nil),   // 9: GroupMsgWithDrawResp
+	(*GroupMsgInfo)(nil),           // 10: GroupMsgInfo
+	(*C2CMsgInfo)(nil),             // 11: C2CMsgInfo
+	(*RoutingHead)(nil),            // 12: RoutingHead
+	(*C2C)(nil),                    // 13: C2C
+	(*Grp)(nil),                    // 14: Grp
+	(*GrpTmp)(nil),                 // 15: GrpTmp
+	(*MsgCtrl)(nil),                // 16: MsgCtrl
+	(*GetMessageResponse)(nil),     // 17: GetMessageResponse
+	(*PushMessagePacket)(nil),      // 18: PushMessagePacket
+	(*UinPairMessage)(nil),         // 19: UinPairMessage
+	(*Message)(nil),                // 20: Message
+	(*MessageBody)(nil),            // 21: MessageBody
+	(*RichText)(nil),               // 22: RichText
+	(*Elem)(nil),                   // 23: Elem
+	(*CommonElem)(nil),             // 24: CommonElem
+	(*QQWalletMsg)(nil),            // 25: QQWalletMsg
+	(*QQWalletAioBody)(nil),        // 26: QQWalletAioBody
+	(*QQWalletAioElem)(nil),        // 27: QQWalletAioElem
+	(*RichMsg)(nil),                // 28: RichMsg
+	(*CustomElem)(nil),             // 29: CustomElem
+	(*Text)(nil),                   // 30: Text
+	(*Attr)(nil),                   // 31: Attr
+	(*Ptt)(nil),                    // 32: Ptt
+	(*OnlineImage)(nil),            // 33: OnlineImage
+	(*NotOnlineImage)(nil),         // 34: NotOnlineImage
+	(*NotOnlineFile)(nil),          // 35: NotOnlineFile
+	(*TransElem)(nil),              // 36: TransElem
+	(*ExtraInfo)(nil),              // 37: ExtraInfo
+	(*GroupFile)(nil),              // 38: GroupFile
+	(*AnonymousGroupMessage)(nil),  // 39: AnonymousGroupMessage
+	(*VideoFile)(nil),              // 40: VideoFile
+	(*SourceMsg)(nil),              // 41: SourceMsg
+	(*Face)(nil),                   // 42: Face
+	(*LightAppElem)(nil),           // 43: LightAppElem
+	(*CustomFace)(nil),             // 44: CustomFace
+	(*ContentHead)(nil),            // 45: ContentHead
+	(*MessageHead)(nil),            // 46: MessageHead
+	(*GroupInfo)(nil),              // 47: GroupInfo
+	(*DiscussInfo)(nil),            // 48: DiscussInfo
+	(*MutilTransHead)(nil),         // 49: MutilTransHead
+	(*C2CTempMessageHead)(nil),     // 50: C2CTempMessageHead
+	(*InstCtrl)(nil),               // 51: InstCtrl
+	(*InstInfo)(nil),               // 52: InstInfo
+	(*ExtGroupKeyInfo)(nil),        // 53: ExtGroupKeyInfo
+	(*SyncCookie)(nil),             // 54: SyncCookie
+	(*TransMsgInfo)(nil),           // 55: TransMsgInfo
+	(*GeneralFlags)(nil),           // 56: GeneralFlags
+	(*PbMultiMsgItem)(nil),         // 57: PbMultiMsgItem
+	(*PbMultiMsgNew)(nil),          // 58: PbMultiMsgNew
+	(*PbMultiMsgTransmit)(nil),     // 59: PbMultiMsgTransmit
+	(*MsgElemInfoServtype3)(nil),   // 60: MsgElemInfo_servtype3
+	(*MsgElemInfoServtype33)(nil),  // 61: MsgElemInfo_servtype33
+	(*SubMsgType0X4Body)(nil),      // 62: SubMsgType0x4Body
+	(*ResvAttr)(nil),               // 63: ResvAttr
+	(*AnimationImageShow)(nil),     // 64: AnimationImageShow
+	(*UinTypeUserDef)(nil),         // 65: UinTypeUserDef
+	(*GetGroupMsgReq)(nil),         // 66: GetGroupMsgReq
+	(*GetGroupMsgResp)(nil),        // 67: GetGroupMsgResp
+	(*PbGetOneDayRoamMsgReq)(nil),  // 68: PbGetOneDayRoamMsgReq
+	(*PbGetOneDayRoamMsgResp)(nil), // 69: PbGetOneDayRoamMsgResp
 }
 var file_msg_proto_depIdxs = []int32{
 	0,  // 0: GetMessageRequest.syncFlag:type_name -> SyncFlag
@@ -7927,19 +8119,21 @@ var file_msg_proto_depIdxs = []int32{
 	52, // 55: InstCtrl.msgExcludeInst:type_name -> InstInfo
 	52, // 56: InstCtrl.msgFromInst:type_name -> InstInfo
 	53, // 57: TransMsgInfo.extGroupKeyInfo:type_name -> ExtGroupKeyInfo
-	20, // 58: PbMultiMsgNew.msg:type_name -> Message
-	20, // 59: PbMultiMsgTransmit.msg:type_name -> Message
-	57, // 60: PbMultiMsgTransmit.pbItemList:type_name -> PbMultiMsgItem
-	44, // 61: MsgElemInfo_servtype3.flash_troop_pic:type_name -> CustomFace
-	34, // 62: MsgElemInfo_servtype3.flash_c2c_pic:type_name -> NotOnlineImage
-	35, // 63: SubMsgType0x4Body.notOnlineFile:type_name -> NotOnlineFile
-	64, // 64: ResvAttr.image_show:type_name -> AnimationImageShow
-	20, // 65: GetGroupMsgResp.msg:type_name -> Message
-	66, // [66:66] is the sub-list for method output_type
-	66, // [66:66] is the sub-list for method input_type
-	66, // [66:66] is the sub-list for extension type_name
-	66, // [66:66] is the sub-list for extension extendee
-	0,  // [0:66] is the sub-list for field type_name
+	58, // 58: PbMultiMsgItem.buffer:type_name -> PbMultiMsgNew
+	20, // 59: PbMultiMsgNew.msg:type_name -> Message
+	20, // 60: PbMultiMsgTransmit.msg:type_name -> Message
+	57, // 61: PbMultiMsgTransmit.pbItemList:type_name -> PbMultiMsgItem
+	44, // 62: MsgElemInfo_servtype3.flash_troop_pic:type_name -> CustomFace
+	34, // 63: MsgElemInfo_servtype3.flash_c2c_pic:type_name -> NotOnlineImage
+	35, // 64: SubMsgType0x4Body.notOnlineFile:type_name -> NotOnlineFile
+	64, // 65: ResvAttr.image_show:type_name -> AnimationImageShow
+	20, // 66: GetGroupMsgResp.msg:type_name -> Message
+	20, // 67: PbGetOneDayRoamMsgResp.msg:type_name -> Message
+	68, // [68:68] is the sub-list for method output_type
+	68, // [68:68] is the sub-list for method input_type
+	68, // [68:68] is the sub-list for extension type_name
+	68, // [68:68] is the sub-list for extension extendee
+	0,  // [0:68] is the sub-list for field type_name
 }
 
 func init() { file_msg_proto_init() }
@@ -8752,6 +8946,30 @@ func file_msg_proto_init() {
 				return nil
 			}
 		}
+		file_msg_proto_msgTypes[67].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PbGetOneDayRoamMsgReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_msg_proto_msgTypes[68].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PbGetOneDayRoamMsgResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -8759,7 +8977,7 @@ func file_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_msg_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   67,
+			NumMessages:   69,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
